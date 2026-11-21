@@ -51,6 +51,8 @@ function fitStage() {
   const h = Math.max(1, Math.round(el ? el.clientHeight : window.innerHeight));
   if (!app) return;
   app.renderer.resize(w, h);
+  // hitArea 必须跟着画布一起改，否则换个窗口尺寸后多出来的那片区域点她完全没反应
+  app.stage.hitArea = new PIXI.Rectangle(0, 0, w, h);
   live2d?.onResize();
 }
 

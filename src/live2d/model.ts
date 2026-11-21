@@ -32,12 +32,14 @@ export interface EmotionState {
 }
 
 export class Live2DManager {
-  /** 模型画布中真正有内容的高度占比（顶点实测 minY=-0.6646 / maxY=0.7119） */
-  private static readonly VISIBLE_RATIO = 0.6883;
-  /** 可见内容区顶端在模型画布中的位置（画布顶部留白 = (1 - maxY)/2 ≈ 0.144） */
-  private static readonly VISIBLE_TOP = 0.144;
-  /** 模型画布中真正有内容的宽度占比（同样由顶点跨度估出，仅用于防溢出） */
-  private static readonly VISIBLE_WIDTH_RATIO = 0.55;
+  /** 模型画布中真正有内容的高度占比（顶点实测 minY=-0.665 / maxY=0.709） */
+  private static readonly VISIBLE_RATIO = 0.686;
+  /** 可见内容区顶端在模型画布中的位置（画布顶部留白 ≈ 0.146） */
+  private static readonly VISIBLE_TOP = 0.146;
+  /** 可见内容区左端在模型画布中的位置（顶点实测 minX=-0.291 → 0.355，留了 1% 余量） */
+  private static readonly VISIBLE_LEFT = 0.345;
+  /** 模型画布中真正有内容的宽度占比（顶点实测 0.355~0.735，放宽到 0.40 把摆动的尾巴/衣角包进去） */
+  private static readonly VISIBLE_WIDTH_RATIO = 0.40;
   /** 角色可见高度 / 舞台高度：任何窗口尺寸都固定这个比例 */
   private static readonly STAGE_FILL = 0.5538;
   /** moc3 画布下方透明留白占模型高度的比例 */
@@ -380,14 +382,14 @@ export class Live2DManager {
     const bounds = this.model.getBounds();
     if (!bounds.width || !bounds.height) return null;
 
-    // 可见内容区在模型画布里的位置（由顶点实测得出，见 VISIBLE_RATIO / VISIBLE_TOP）
-    const visLeft = (1 - Live2DManager.VISIBLE_WIDTH_RATIO) / 2;
+    // 可见内容区在模型画布里的位置（由顶点实测得出，见 VISIBLE_RATIO / VISIBLE_TOP / VISIBLE_LEFT）
+    const visLeft = Live2DManager.VISIBLE_LEFT;
     const visTop = Live2DManager.VISIBLE_TOP;
     const normX =
       ((x - bounds.x) / bounds.width - visLeft) / Live2DManager.VISIBLE_WIDTH_RATIO;
     const normY = ((y - bounds.y) / bounds.height - visTop) / Live2DManager.VISIBLE_RATIO;
-    // 落在她的实际轮廓之外视为点了空白 / 背景
-    if (normX < 0 || normX > 1 || normY < 0 || normY > 1) return null;
+    // 落在她的实际轮廓之外（留 2% 容差）视为点了空白 / 背景
+    if (normX < -0.02 || normX > 1.02 || normY < -0.02 || normY > 1.02) return null;
 
     for (const zone of this.character.zones) {
       if (normY >= zone.from && normY <= zone.to) {
@@ -398,7 +400,13 @@ export class Live2DManager {
         }
       }
     }
-    return null;
+
+    // 兜底：点在她身上却没落进任何 zone（轮廓里的缝隙，比如尾巴和裙摆之间），
+    // 仍然算点到她身上，按高度归到最接近的部位——绝不把点击让给背后的家具。
+    const ny = Math.min(1, Math.max(0, normY));
+    if (ny < 0.26) return ny < 0.19 ? 'head' : 'face';
+    if (ny < 0.68) return 'body';
+    return 'legs';
   }
 
   // 依据模型真实尺寸与舞台可见区，自适应缩放并居中
