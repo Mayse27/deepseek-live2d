@@ -37,7 +37,7 @@ export class Live2DManager {
   /** 模型画布中真正有内容的宽度占比（同样由顶点跨度估出，仅用于防溢出） */
   private static readonly VISIBLE_WIDTH_RATIO = 0.55;
   /** 角色可见高度 / 舞台高度：任何窗口尺寸都固定这个比例 */
-  private static readonly STAGE_FILL = 0.426;
+  private static readonly STAGE_FILL = 0.5538;
   /** moc3 画布下方透明留白占模型高度的比例 */
   private static readonly FOOT_BLANK = 0.168;
 
