@@ -32,6 +32,15 @@ export interface EmotionState {
 }
 
 export class Live2DManager {
+  /** 模型画布中真正有内容的高度占比（顶点实测 minY=-0.6646 / maxY=0.7119） */
+  private static readonly VISIBLE_RATIO = 0.6883;
+  /** 模型画布中真正有内容的宽度占比（同样由顶点跨度估出，仅用于防溢出） */
+  private static readonly VISIBLE_WIDTH_RATIO = 0.55;
+  /** 角色可见高度 / 舞台高度：任何窗口尺寸都固定这个比例 */
+  private static readonly STAGE_FILL = 0.426;
+  /** moc3 画布下方透明留白占模型高度的比例 */
+  private static readonly FOOT_BLANK = 0.168;
+
   private app: PIXI.Application;
   private model: Live2DModel | null = null;
   private character: CharacterConfig | null = null;
@@ -57,7 +66,13 @@ export class Live2DManager {
   // 用户可调的角色布局：原始尺寸缓存 + 缩放倍率/水平位置/垂直位置
   private baseW = 3326;
   private baseH = 4992;
-  private userLayout = { scaleMul: 1, offsetX: 0.5, offsetY: 0.95 };
+  private userLayout = { scaleMul: 1, offsetX: 0.5, offsetY: 0.9 };
+  /** 手动保存过布局后锁住，窗口变化只按高度等比跟随 */
+  private locked = false;
+  private lockBase = 0;
+  private lockRefH = 0;
+  private lastAutoScale = 0;
+  private layoutRaf = 0;
   /** 说话时的嘴型驱动 */
   private talking = false;
   private mouthPhase = 0;
@@ -383,34 +398,41 @@ export class Live2DManager {
     if (!this.model) return;
     const W = this.app.screen.width;
     const H = this.app.screen.height;
-    // 右侧聊天面板 420px；窄屏(<=860)时聊天移到下方，舞台占满宽度
-    const stageW = window.innerWidth <= 860 ? W : Math.max(320, W - 420);
+    // canvas 现在挂在 .stage-canvas 里，renderer 已按舞台尺寸 resize，
+    // 所以 app.screen 就是舞台可见区，直接用，不再扣侧栏宽度。
+    const stageW = Math.max(160, W);
 
     // 还原模型原始尺寸（model.width 已含当前 scale）
-    const origW = (this.model.width / this.model.scale.x) || 3326;
-    const origH = (this.model.height / this.model.scale.y) || 4992;
+    const origW = (this.model.width / this.model.scale.x) || this.baseW;
+    const origH = (this.model.height / this.model.scale.y) || this.baseH;
 
-    // 目标：角色占舞台高度约 62%，符合站在小屋里的正常身高比例，宽高取小值防溢出
-    // 舞台变宽（全屏/大屏）时视野横向拉长，角色按宽高比小幅补正，保持"相对画面"的观感一致；
-    // 只影响角色缩放，不动背景与面板。
-    const refRatio = 0.758; // 标准布局基准：舞台宽 / 画面高
-    const ratio = stageW / Math.max(1, H);
-    const sizeBoost = Math.max(1, Math.pow(ratio / refRatio, 0.35));
-    let base = (H * 0.62 * sizeBoost) / origH;
-    const maxByW = (stageW * 0.92) / origW;
-    if (base > maxByW) base = maxByW;
-    const scale = base * this.userLayout.scaleMul;
+    // 目标：角色可见高度恒定占舞台高度的固定比例 —— 不随窗口宽高比变化，
+    // 所以拉伸窗口 / 全屏时她不会忽大忽小地跳。
+    const visH0 = origH * Live2DManager.VISIBLE_RATIO;
+    const visW0 = origW * Live2DManager.VISIBLE_WIDTH_RATIO;
+    const autoScale = (H * Live2DManager.STAGE_FILL) / visH0;
+    this.lastAutoScale = autoScale;
 
-    // 锚点放画布底边；offsetY 表示的是「鞋底」落在舞台高度的哪个比例。
-    // moc3 画布下方有大量透明留白（这套模型实测约 29.8% 模型高度），
-    // 直接把画布底边当地面线会让角色悬空，所以把那段留白补回去。
+    // 手动保存过布局：不再套用自动比例，只按舞台高度等比跟随，
+    // 这样主人调好的大小在换窗口后仍是原样，不会被打回默认。
+    let scale =
+      this.locked && this.lockBase > 0 && this.lockRefH > 0
+        ? this.lockBase * (H / this.lockRefH)
+        : autoScale;
+    scale *= this.userLayout.scaleMul;
+
+    // 防溢出：只有极窄或极扁的窗口才触发
+    const maxByW = (stageW * 0.94) / visW0;
+    if (scale > maxByW) scale = maxByW;
+
+    // 锚点放画布底边；offsetY 表示「鞋底」落在舞台高度的哪个比例。
+    // moc3 画布下方有透明留白（实测 16.8% 模型高度），补回去才踩得住地面。
     this.model.anchor.set(0.5, 1.0);
     this.model.scale.set(scale);
 
-    const FOOT_BLANK = 0.168;
     const displayH = origH * scale;
     const footY = Math.min(H - 8, H * this.userLayout.offsetY);
-    const posY = footY + displayH * FOOT_BLANK;
+    const posY = footY + displayH * Live2DManager.FOOT_BLANK;
 
     this.model.position.set(stageW * this.userLayout.offsetX, posY);
   }
@@ -423,12 +445,53 @@ export class Live2DManager {
     this.layout();
   }
 
+  /** 锁定当前布局：窗口再变也只按高度等比跟随 */
+  lockLayout() {
+    if (this.lastAutoScale > 0) {
+      this.locked = true;
+      this.lockBase = this.lastAutoScale;
+      this.lockRefH = this.app.screen.height;
+    }
+    this.layout();
+  }
+
+  /** 解除锁定，回到「固定占舞台比例」的自动模式 */
+  unlockLayout() {
+    this.locked = false;
+    this.lockBase = 0;
+    this.lockRefH = 0;
+    this.layout();
+  }
+
+  /** 从本地恢复锁定状态 */
+  restoreLock(refH: number, base: number) {
+    if (refH > 0 && base > 0) {
+      this.locked = true;
+      this.lockRefH = refH;
+      this.lockBase = base;
+    } else {
+      this.locked = false;
+      this.lockRefH = 0;
+      this.lockBase = 0;
+    }
+    this.layout();
+  }
+
+  getLockState() {
+    return { locked: this.locked, lockRefH: this.lockRefH, lockBase: this.lockBase };
+  }
+
   getUserLayout() {
     return { ...this.userLayout };
   }
 
   onResize() {
-    this.layout();
+    // 合并同一帧内的多次尺寸变化，避免中途尺寸造成的跳动
+    if (this.layoutRaf) cancelAnimationFrame(this.layoutRaf);
+    this.layoutRaf = requestAnimationFrame(() => {
+      this.layoutRaf = 0;
+      this.layout();
+    });
   }
 
   destroy() {

@@ -11,6 +11,27 @@ const DB_NAME = 'deepseek-live2d';
 const DB_VERSION = 1;
 const MAX_HISTORY = 200;
 
+/** 角色布局偏好：scaleMul 倍率，offsetX/offsetY 为舞台内的比例位置 */
+export interface LayoutPref {
+  scaleMul: number;
+  offsetX: number;
+  offsetY: number;
+  /** true = 主人手动保存过，窗口变化时不再套用自动比例 */
+  locked?: boolean;
+  /** 锁定时记录的舞台高度与基准缩放，用于按新高度等比跟随 */
+  lockRefH?: number;
+  lockBase?: number;
+}
+
+export const DEFAULT_LAYOUT: LayoutPref = {
+  scaleMul: 1,
+  offsetX: 0.5,
+  offsetY: 0.9,
+  locked: false,
+  lockRefH: 0,
+  lockBase: 0,
+};
+
 class Store {
   private db: IDBPDatabase | null = null;
   private memory: Record<string, any> = {};
@@ -122,19 +143,22 @@ class Store {
     return (await this.get<string>('current_skin')) ?? 'default';
   }
 
-  /** 用户可调的角色布局（大小/左右/上下） */
-  async getLayout(): Promise<{ scaleMul: number; offsetX: number; offsetY: number }> {
-    const DEFAULT = { scaleMul: 1, offsetX: 0.5, offsetY: 0.90 };
-    const saved = await this.get<{ scaleMul: number; offsetX: number; offsetY: number }>('char_layout_v3');
+  /** 用户可调的角色布局（大小/左右/上下；locked 表示手动保存过，不再被自动比例覆盖） */
+  async getLayout(): Promise<LayoutPref> {
+    const DEFAULT: LayoutPref = { ...DEFAULT_LAYOUT };
+    const saved = await this.get<LayoutPref>('char_layout_v4');
     if (!saved) return DEFAULT;
     return {
       scaleMul: typeof saved.scaleMul === 'number' ? saved.scaleMul : DEFAULT.scaleMul,
       offsetX: typeof saved.offsetX === 'number' ? saved.offsetX : DEFAULT.offsetX,
       offsetY: typeof saved.offsetY === 'number' ? saved.offsetY : DEFAULT.offsetY,
+      locked: saved.locked === true,
+      lockRefH: typeof saved.lockRefH === 'number' ? saved.lockRefH : 0,
+      lockBase: typeof saved.lockBase === 'number' ? saved.lockBase : 0,
     };
   }
-  async setLayout(v: { scaleMul: number; offsetX: number; offsetY: number }) {
-    await this.set('char_layout_v3', v);
+  async setLayout(v: LayoutPref) {
+    await this.set('char_layout_v4', v);
   }
 }
 

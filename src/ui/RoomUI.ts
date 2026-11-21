@@ -254,7 +254,7 @@ export class RoomUI {
       </div>`;
     const pct = (v: number) => Math.round(v * 100) + '%';
     const overlay = this.modal('🎛️ 调整角色', `
-      <p class="hint">拖滑块实时预览，满意了点「保存」，刷新后依然生效。改大小会自动把脚底补回地板，不会飘起来。</p>
+      <p class="hint">拖滑块实时预览，满意了点「保存」，刷新后依然生效。保存后她会锁定在这个大小，以后换窗口、全屏也不会被打回默认，只按画面高度等比跟着走。</p>
       <div class="layout-panel">
         ${row('scaleMul', '人物大小', 0.4, 2.2, 0.02, cur.scaleMul, v => Math.round(v * 100) + '%')}
         ${row('offsetX', '左右位置', 0.1, 0.9, 0.01, cur.offsetX, pct)}

@@ -5,7 +5,7 @@ import { pickZoneLine, normalizeZone } from './live2d/zoneLines';
 import { ChatUI } from './chat/ChatUI';
 import { DeepSeekAPI } from './chat/DeepSeekAPI';
 import { PluginManager } from './plugins/PluginManager';
-import { Store } from './store';
+import { Store, DEFAULT_LAYOUT } from './store';
 import { BuiltinPlugins } from './plugins/builtins';
 import { RoomUI } from './ui/RoomUI';
 import { asset } from './util/asset';
@@ -80,9 +80,12 @@ export async function createApp() {
   live2d = new Live2DManager(app);
   try {
     await live2d.loadModel(asset('model/newfish.model3.json'), asset('model/character.json'));
-    // 恢复用户保存的角色布局（大小/左右/上下）
+    // 恢复用户保存的角色布局（大小/左右/上下）；手动保存过就锁住，不让自动比例覆盖
     const savedLayout = await store.getLayout();
     live2d.setUserLayout(savedLayout);
+    if (savedLayout.locked && savedLayout.lockRefH && savedLayout.lockBase) {
+      live2d.restoreLock(savedLayout.lockRefH, savedLayout.lockBase);
+    }
     live2d.startIdleMotion();
   } catch (e) {
     console.error('[Live2D] 模型加载失败', e);
@@ -162,13 +165,17 @@ export async function createApp() {
   }) as EventListener);
   window.addEventListener('layout-save', (async (e: any) => {
     live2d.setUserLayout(e.detail || {});
-    await store.setLayout(live2d.getUserLayout());
-    roomUI.toast('角色位置已保存～');
+    // 点保存即锁定：此后窗口怎么变，都只按舞台高度等比跟随，不会被自动比例打回默认
+    live2d.lockLayout();
+    const lock = live2d.getLockState();
+    await store.setLayout({ ...live2d.getUserLayout(), locked: true, lockRefH: lock.lockRefH, lockBase: lock.lockBase });
+    roomUI.toast('角色位置已保存～以后换窗口也保持这个大小');
   }) as EventListener);
   window.addEventListener('layout-reset', (async () => {
-    const def = { scaleMul: 1, offsetX: 0.5, offsetY: 0.90 };
-    live2d.setUserLayout(def);
-    await store.setLayout(def);
+    live2d.unlockLayout();
+    live2d.setUserLayout(DEFAULT_LAYOUT);
+    await store.setLayout({ ...DEFAULT_LAYOUT });
+    roomUI.toast('已恢复默认，跟着窗口自动调整');
   }) as EventListener);
 
   // 12c. 语音：她说话时驱动嘴型，收到回复后朗读
