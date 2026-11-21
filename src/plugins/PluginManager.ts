@@ -78,7 +78,8 @@ export class PluginManager {
         window.dispatchEvent(new CustomEvent('room-actions-changed', { detail: this.roomActions }));
       },
       systemMessage: (text) => {
-        chatUI.addMessage('assistant', text);
+        // 屏幕提示不写库、不朗读，避免每次刷新累积一堆系统气泡
+        chatUI.addMessage('assistant', text, false);
       },
       emotion: (name) => live2d.playEmotion(name),
     };

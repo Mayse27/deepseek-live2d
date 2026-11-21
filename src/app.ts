@@ -27,7 +27,7 @@ function showLoading(show: boolean, text?: string) {
     overlay = document.createElement('div');
     overlay.className = 'loading-overlay';
     overlay.innerHTML = `
-      <div class="logo">🐋</div>
+      <img class="logo-img" src="${asset('icon/loading.png')}" alt="Loading">
       <h1>DeepSeek 娘 · 互动小屋</h1>
       <p class="loading-text">正在准备房间…</p>
       <div class="spinner"></div>
@@ -44,14 +44,24 @@ function showLoading(show: boolean, text?: string) {
   }
 }
 
+/** 让 canvas 的实际尺寸跟随舞台区（桌面是左半屏，手机是上半屏） */
+function fitStage() {
+  const el = roomUI?.getStageEl?.();
+  const w = Math.max(1, Math.round(el ? el.clientWidth : window.innerWidth));
+  const h = Math.max(1, Math.round(el ? el.clientHeight : window.innerHeight));
+  if (!app) return;
+  app.renderer.resize(w, h);
+  live2d?.onResize();
+}
+
 export async function createApp() {
   const root = document.getElementById('app')!;
   showLoading(true, '正在准备房间…');
 
   // 1. PIXI Application（v7 同步构造）
   app = new PIXI.Application({
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: 800,
+    height: 600,
     backgroundAlpha: 0,
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
@@ -98,11 +108,12 @@ export async function createApp() {
 
   // 8. 房间 UI（会挂载聊天区）
   roomUI = new RoomUI(store, pluginManager, chatUI);
-  const stageMount = document.createElement('div');
-  stageMount.style.cssText = 'position:absolute;inset:0;z-index:1';
-  root.appendChild(stageMount);
-  stageMount.appendChild(app.view as HTMLCanvasElement);
   roomUI.mount(root);
+  // canvas 挂进舞台区，尺寸跟舞台走（手机上舞台只占半屏，不能再按窗口算）
+  const stageMount = document.createElement('div');
+  stageMount.className = 'stage-canvas';
+  stageMount.appendChild(app.view as HTMLCanvasElement);
+  roomUI.getStageEl().appendChild(stageMount);
 
   // 9. 事件绑定
   chatUI.onSend = async (text: string) => pluginReply(text);
@@ -115,12 +126,14 @@ export async function createApp() {
     if (msg.role !== 'system') chatUI.addMessage(msg.role, msg.content, false);
   });
 
-  // 11. resize
-  window.addEventListener('resize', () => {
-    app.renderer.resize(window.innerWidth, window.innerHeight);
-    live2d.onResize();
-    roomUI.onResize();
-  });
+  // 11. resize：始终按舞台区的真实尺寸重算（手机断点、地址栏收放都会变）
+  fitStage();
+  window.addEventListener('resize', () => fitStage());
+  window.addEventListener('orientationchange', () => setTimeout(() => fitStage(), 250));
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(() => fitStage());
+    ro.observe(roomUI.getStageEl());
+  }
 
   // 12. Key 变更
   window.addEventListener('deepseek-key-change', ((e: any) => {

@@ -85,12 +85,53 @@ html, body {
   background: #101a2e;
 }
 
-/* PIXI canvas 铺满舞台区 */
-.stage-area canvas {
+/* PIXI canvas 容器：尺寸由 JS 按舞台实际大小设定，这里只负责铺满 */
+.stage-canvas {
   position: absolute;
   inset: 0;
+  z-index: 1;
+}
+.stage-canvas canvas {
+  display: block;
   width: 100% !important;
   height: 100% !important;
+}
+
+/* 工具箱按钮（手机端才显示） */
+.tools-fab {
+  display: none;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 8;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(14, 24, 42, 0.72);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tools-fab:active { transform: scale(0.94); }
+
+/* 工具箱抽屉里的按钮 */
+.tools-drawer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.tools-drawer .tool-btn {
+  justify-content: center;
+  padding: 11px 10px;
+  font-size: 0.82rem;
 }
 
 /* 舞台氛围装饰 */
@@ -543,6 +584,12 @@ html, body {
 }
 .loading-overlay.hidden { opacity: 0; pointer-events: none; }
 .loading-overlay .logo { font-size: 3rem; animation: float 3s ease-in-out infinite; }
+.loading-overlay .logo-img {
+  width: 132px; height: 132px; border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 10px 40px rgba(126,200,227,0.35);
+  animation: float 3s ease-in-out infinite;
+}
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
 .loading-overlay h1 { margin: 16px 0 6px; font-size: 1.5rem; color: var(--accent-light); }
 .loading-overlay p { color: var(--text-dim); font-size: 0.9rem; }
@@ -556,7 +603,39 @@ html, body {
 
 /* ========== 响应式 ========== */
 @media (max-width: 860px) {
-  .room { grid-template-columns: 1fr; grid-template-rows: 45vh 55vh; }
-  .side-panel { border-left: none; border-top: 1px solid var(--border); padding: 10px; }
-  .character-tag h1 { font-size: 1.3rem; }
+  /* 上舞台下聊天：用 dvh 才不会被手机地址栏吃掉一截 */
+  .room {
+    grid-template-columns: 1fr;
+    grid-template-rows: calc(100dvh - 46vh) 46vh;
+    height: 100dvh;
+  }
+  .side-panel {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding: 8px 10px 10px;
+    gap: 8px;
+  }
+  /* 手机上工具全部收进右上角按钮，聊天区整块留给对话 */
+  .toolbar { display: none; }
+  .tools-fab { display: flex; }
+  .character-tag { top: 10px; left: 12px; padding: 6px 10px; }
+  .character-tag h1 { font-size: 1rem; }
+  .character-tag .status { font-size: 0.7rem; }
+  .chat-header h2 { font-size: 0.88rem; }
+  .side-panel .chat-container { border-radius: 12px; }
+  .settings-panel, .modal-panel { padding: 18px; }
+  .modal-panel { width: 92%; max-height: 82dvh; overflow-y: auto; }
+  .loading-overlay .logo-img { width: 104px; height: 104px; }
+  .loading-overlay h1 { font-size: 1.2rem; }
+  .loading-overlay p { font-size: 0.82rem; }
+}
+
+/* 横屏手机：舞台和聊天左右分，别上下挤 */
+@media (max-width: 860px) and (orientation: landscape) {
+  .room {
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: 100dvh;
+    height: 100dvh;
+  }
+  .side-panel { border-left: 1px solid var(--border); border-top: none; }
 }

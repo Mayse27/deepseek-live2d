@@ -45,6 +45,7 @@ export class RoomUI {
   private bubble: HTMLElement;
   private toastContainer: HTMLElement;
   private modalHost: HTMLElement;
+  private stageEl!: HTMLElement;
   private speechTimer: number | null = null;
   private bgIndex = 0;
 
@@ -65,18 +66,25 @@ export class RoomUI {
         </div>
         <div class="speech-bubble"></div>
         <div class="floaters"></div>
+        <button class="tools-fab" title="打开工具箱">☰</button>
       </div>
       <div class="side-panel">
         <div class="toolbar"></div>
       </div>
     `;
     this.toolbar = this.root.querySelector('.toolbar')!;
+    this.stageEl = this.root.querySelector('.stage-area')!;
     this.bubble = this.root.querySelector('.speech-bubble')!;
     this.createFloaters();
 
     this.toastContainer = document.createElement('div');
     this.toastContainer.className = 'toast-container';
     this.modalHost = document.createElement('div');
+  }
+
+  /** 舞台容器（PIXI canvas 要挂进这里，尺寸跟它走） */
+  getStageEl(): HTMLElement {
+    return this.stageEl;
   }
 
   mount(parent: HTMLElement) {
@@ -108,30 +116,31 @@ export class RoomUI {
     }
   }
 
-  private renderToolbar() {
-    this.toolbar.innerHTML = '';
+  /** 收集全部工具项（工具栏和手机端抽屉共用同一份清单） */
+  private collectTools(): Array<{ key: string; icon: string; label: string; title: string; run: () => void }> {
+    const items: Array<{ key: string; icon: string; label: string; title: string; run: () => void }> = [];
 
-    // 插件按钮
     for (const btn of this.plugins.getToolButtons()) {
-      const el = document.createElement('button');
-      el.className = 'tool-btn';
-      el.title = btn.title || btn.label;
-      el.dataset.toolId = btn.id;
-      el.innerHTML = `${btn.icon} ${btn.label.replace(btn.icon, '').trim()}`;
-      el.addEventListener('click', () => this.plugins.invokeTool(btn.id));
-      this.toolbar.appendChild(el);
+      items.push({
+        key: `tool:${btn.id}`,
+        icon: btn.icon,
+        label: btn.label.replace(btn.icon, '').trim(),
+        title: btn.title || btn.label,
+        run: () => this.plugins.invokeTool(btn.id),
+      });
     }
 
     // 房间动作按钮（摸头/碰尾巴改为直接点角色触发，不在工具栏显示）
     const hiddenActions = new Set(['pat-head', 'touch-tail']);
     for (const action of this.plugins.getRoomActions()) {
       if (hiddenActions.has(action.id)) continue;
-      const el = document.createElement('button');
-      el.className = 'tool-btn';
-      el.title = action.label;
-      el.innerHTML = `${action.icon} ${action.label}`;
-      el.addEventListener('click', () => this.plugins.invokeRoomAction(action.id));
-      this.toolbar.appendChild(el);
+      items.push({
+        key: `action:${action.id}`,
+        icon: action.icon,
+        label: action.label,
+        title: action.label,
+        run: () => this.plugins.invokeRoomAction(action.id),
+      });
     }
 
     // 固定功能按钮
@@ -142,16 +151,46 @@ export class RoomUI {
       ['ℹ️', '关于', () => this.showAbout()],
     ];
     for (const [icon, label, fn] of extras) {
+      items.push({ key: `extra:${label}`, icon, label, title: label, run: fn });
+    }
+
+    return items;
+  }
+
+  private renderToolbar() {
+    this.toolbar.innerHTML = '';
+    for (const item of this.collectTools()) {
       const el = document.createElement('button');
       el.className = 'tool-btn';
-      el.title = label;
-      el.innerHTML = `${icon} ${label}`;
-      el.addEventListener('click', fn);
+      el.title = item.title;
+      el.dataset.toolKey = item.key;
+      el.innerHTML = `${item.icon} ${item.label}`;
+      el.addEventListener('click', item.run);
       this.toolbar.appendChild(el);
     }
   }
 
+  /** 手机端：舞台右上角按钮打开的抽屉，把所有工具收进一层 */
+  private openToolsDrawer() {
+    const overlay = this.modal('🧰 工具箱', '<div class="tools-drawer"></div>');
+    const host = overlay.querySelector('.tools-drawer') as HTMLElement;
+    for (const item of this.collectTools()) {
+      const el = document.createElement('button');
+      el.className = 'tool-btn';
+      el.title = item.title;
+      el.dataset.toolKey = item.key;
+      el.innerHTML = `${item.icon} ${item.label}`;
+      el.addEventListener('click', () => {
+        overlay.remove();
+        item.run();
+      });
+      host.appendChild(el);
+    }
+  }
+
   private bindEvents() {
+    this.root.querySelector('.tools-fab')!.addEventListener('click', () => this.openToolsDrawer());
+
     window.addEventListener('tools-changed', () => this.renderToolbar());
     window.addEventListener('room-actions-changed', () => this.renderToolbar());
 
@@ -328,7 +367,8 @@ export class RoomUI {
     }
 
     this.store.set('mood', m.id);
-    window.dispatchEvent(new CustomEvent('mood-selected', { detail: m.id }));
+    // 首次恢复不播报，免得每次打开都多一条系统消息
+    if (!instant) window.dispatchEvent(new CustomEvent('mood-selected', { detail: m.id }));
   }
 
   private openPluginPanel() {
