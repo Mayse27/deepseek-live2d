@@ -71,6 +71,7 @@ export class RoomUI {
       <div class="side-panel">
         <div class="toolbar"></div>
       </div>
+      <button class="collapse-btn" title="收起 / 展开聊天面板"><span class="cb-arrow">›</span></button>
     `;
     this.toolbar = this.root.querySelector('.toolbar')!;
     this.stageEl = this.root.querySelector('.stage-area')!;
@@ -99,6 +100,10 @@ export class RoomUI {
     this.bindEvents();
     // 恢复已保存的时段背景（首次直接切换，不做淡入）
     this.store.get<string>('mood').then(id => this.applyMood(id || 'morning', true));
+    // 恢复上次的折叠状态
+    this.store.get<boolean>('chat_collapsed').then(v => {
+      if (v) this.toggleSidePanel(true);
+    });
   }
 
   private createFloaters() {
@@ -191,6 +196,9 @@ export class RoomUI {
   private bindEvents() {
     this.root.querySelector('.tools-fab')!.addEventListener('click', () => this.openToolsDrawer());
 
+    // 聊天面板折叠 / 展开
+    this.root.querySelector('.collapse-btn')!.addEventListener('click', () => this.toggleSidePanel());
+
     window.addEventListener('tools-changed', () => this.renderToolbar());
     window.addEventListener('room-actions-changed', () => this.renderToolbar());
 
@@ -213,6 +221,21 @@ export class RoomUI {
     this.bubble.classList.add('show');
     if (this.speechTimer) clearTimeout(this.speechTimer);
     this.speechTimer = window.setTimeout(() => this.bubble.classList.remove('show'), 3500);
+  }
+
+  /** 收起 / 展开聊天面板（手机竖屏是上下折叠，桌面是左右折叠） */
+  toggleSidePanel(force?: boolean) {
+    const collapsed = typeof force === 'boolean' ? force : !this.root.classList.contains('collapsed');
+    this.root.classList.toggle('collapsed', collapsed);
+    const btn = this.root.querySelector('.collapse-btn') as HTMLElement | null;
+    if (btn) btn.title = collapsed ? '展开聊天面板' : '收起聊天面板';
+    this.store.set('chat_collapsed', collapsed);
+    // 舞台尺寸变了，让 canvas 重新贴合
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  isSidePanelCollapsed(): boolean {
+    return this.root.classList.contains('collapsed');
   }
 
   toast(text: string) {

@@ -34,6 +34,8 @@ export interface EmotionState {
 export class Live2DManager {
   /** 模型画布中真正有内容的高度占比（顶点实测 minY=-0.6646 / maxY=0.7119） */
   private static readonly VISIBLE_RATIO = 0.6883;
+  /** 可见内容区顶端在模型画布中的位置（画布顶部留白 = (1 - maxY)/2 ≈ 0.144） */
+  private static readonly VISIBLE_TOP = 0.144;
   /** 模型画布中真正有内容的宽度占比（同样由顶点跨度估出，仅用于防溢出） */
   private static readonly VISIBLE_WIDTH_RATIO = 0.55;
   /** 角色可见高度 / 舞台高度：任何窗口尺寸都固定这个比例 */
@@ -370,15 +372,21 @@ export class Live2DManager {
     }, 3000 + Math.random() * 2000);
   }
 
-  // 点击测试：用显示包围盒归一化（与 e.global 同为 stage 坐标系，单位一致）
+  // 点击测试：把点击点映射到「画布中真正有内容的那块矩形」再归一化。
+  // 直接用 getBounds() 会把画布四周的透明留白也算成她，导致点旁边的家具也被判成点她。
   hitTest(x: number, y: number): string | null {
     if (!this.character || !this.model) return null;
 
     const bounds = this.model.getBounds();
     if (!bounds.width || !bounds.height) return null;
-    const normX = (x - bounds.x) / bounds.width;
-    const normY = (y - bounds.y) / bounds.height;
-    // 落在模型显示区之外视为空白
+
+    // 可见内容区在模型画布里的位置（由顶点实测得出，见 VISIBLE_RATIO / VISIBLE_TOP）
+    const visLeft = (1 - Live2DManager.VISIBLE_WIDTH_RATIO) / 2;
+    const visTop = Live2DManager.VISIBLE_TOP;
+    const normX =
+      ((x - bounds.x) / bounds.width - visLeft) / Live2DManager.VISIBLE_WIDTH_RATIO;
+    const normY = ((y - bounds.y) / bounds.height - visTop) / Live2DManager.VISIBLE_RATIO;
+    // 落在她的实际轮廓之外视为点了空白 / 背景
     if (normX < 0 || normX > 1 || normY < 0 || normY > 1) return null;
 
     for (const zone of this.character.zones) {

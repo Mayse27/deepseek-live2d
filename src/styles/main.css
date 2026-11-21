@@ -69,11 +69,52 @@ html, body {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: 1fr 420px;
+  grid-template-columns: 1fr var(--panel-w, 420px);
   grid-template-rows: minmax(0, 1fr);
   gap: 0;
   min-height: 0;
+  --panel-w: 420px;
+  --panel-h: 0px;
+  transition: grid-template-columns 0.28s ease;
 }
+.room.collapsed { --panel-w: 0px; }
+.room.collapsed .side-panel > * {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+/* 收起后按钮要留在屏幕内，不能一半掉出边界 */
+.room.collapsed .collapse-btn { right: 6px; transform: translate(0, -50%); }
+.room.collapsed .collapse-btn:active { transform: translate(0, -50%) scale(0.92); }
+
+/* 聊天面板折叠按钮：贴在舞台与侧栏的交界线上 */
+.collapse-btn {
+  position: absolute;
+  z-index: 20;
+  right: var(--panel-w);
+  top: 50%;
+  transform: translate(50%, -50%);
+  width: 22px;
+  height: 56px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: rgba(14, 24, 42, 0.78);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  transition: right 0.28s ease, bottom 0.28s ease, background 0.2s, transform 0.15s;
+}
+.collapse-btn:hover { background: rgba(58, 123, 213, 0.55); }
+.collapse-btn:active { transform: translate(50%, -50%) scale(0.92); }
+.room.collapsed .collapse-btn .cb-arrow { transform: rotate(180deg); }
+.collapse-btn .cb-arrow { display: block; transition: transform 0.28s ease; }
 
 .stage-area {
   position: relative;
@@ -473,6 +514,10 @@ html, body {
   border-radius: 18px;
   padding: 26px;
   width: 90%; max-width: 400px;
+  /* 弹窗内容再长也不能超出屏幕 —— 内部自己滚 */
+  max-height: calc(100dvh - 56px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 24px 64px rgba(0,0,0,0.6);
 }
 .settings-panel h3, .modal-panel h3 { margin: 0 0 8px; color: var(--accent-light); }
@@ -606,9 +651,12 @@ html, body {
   /* 上舞台下聊天：用 dvh 才不会被手机地址栏吃掉一截 */
   .room {
     grid-template-columns: 1fr;
-    grid-template-rows: calc(100dvh - 46vh) 46vh;
+    grid-template-rows: calc(100dvh - var(--panel-h)) var(--panel-h);
     height: 100dvh;
+    --panel-w: 0px;
+    --panel-h: 46vh;
   }
+  .room.collapsed { --panel-h: 0px; }
   .side-panel {
     border-left: none;
     border-top: 1px solid var(--border);
@@ -623,19 +671,63 @@ html, body {
   .character-tag .status { font-size: 0.7rem; }
   .chat-header h2 { font-size: 0.88rem; }
   .side-panel .chat-container { border-radius: 12px; }
+  /* 设置面板：手机上一屏放不下，必须能滚 */
   .settings-panel, .modal-panel { padding: 18px; }
-  .modal-panel { width: 92%; max-height: 82dvh; overflow-y: auto; }
+  .settings-panel, .modal-panel {
+    width: 92%;
+    max-height: calc(100dvh - 56px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .loading-overlay .logo-img { width: 104px; height: 104px; }
   .loading-overlay h1 { font-size: 1.2rem; }
   .loading-overlay p { font-size: 0.82rem; }
+  /* 竖向：折叠按钮横躺在上下交界处中间 */
+  .collapse-btn {
+    right: auto;
+    left: 50%;
+    top: auto;
+    bottom: var(--panel-h);
+    transform: translate(-50%, 50%);
+    width: 56px;
+    height: 22px;
+    border-radius: 11px;
+  }
+  .collapse-btn:active { transform: translate(-50%, 50%) scale(0.94); }
+  /* 横躺的按钮：箭头朝下（收起）/ 朝上（展开），不能还朝右 */
+  .collapse-btn .cb-arrow { transform: rotate(90deg); }
+  .room.collapsed .collapse-btn .cb-arrow { transform: rotate(270deg); }
+  /* 收起后：竖屏按钮贴到底边内侧 */
+  .room.collapsed .collapse-btn {
+    bottom: 6px;
+    transform: translate(-50%, 0);
+  }
+  .room.collapsed .collapse-btn:active { transform: translate(-50%, 0) scale(0.94); }
 }
 
 /* 横屏手机：舞台和聊天左右分，别上下挤 */
 @media (max-width: 860px) and (orientation: landscape) {
   .room {
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: 1fr var(--panel-w);
     grid-template-rows: 100dvh;
     height: 100dvh;
+    --panel-w: 340px;
+    --panel-h: 0px;
   }
+  .room.collapsed { --panel-w: 0px; }
   .side-panel { border-left: 1px solid var(--border); border-top: none; }
+  /* 横屏回到左右分栏的样子：竖条按钮，贴在交界线中间 */
+  .collapse-btn {
+    right: var(--panel-w);
+    left: auto;
+    top: 50%;
+    bottom: auto;
+    transform: translate(50%, -50%);
+    width: 22px;
+    height: 56px;
+  }
+  .collapse-btn:active { transform: translate(50%, -50%) scale(0.94); }
+  /* 横屏按钮又是竖条了：箭头回到朝左 / 朝右 */
+  .collapse-btn .cb-arrow { transform: none; }
+  .room.collapsed .collapse-btn .cb-arrow { transform: rotate(180deg); }
 }

@@ -105,6 +105,76 @@ const LINES: Record<string, ZoneLine[]> = {
     { text: '要一起坐着发会儿呆吗', emotion: 'happy' },
     { text: '刚才走神了…你说什么？', emotion: 'confused' },
   ],
+
+  // ===== 背景物件：点房间里的东西，她说跟那个东西有关的话 =====
+  bed: [
+    { text: '这张床…晚上会不会太软了', emotion: 'happy' },
+    { text: '被子是我叠的哦，别弄乱啦', emotion: 'smug' },
+    { text: '想躺上去试试？…那就躺一下', emotion: 'shy' },
+    { text: '床单刚换过，闻到太阳的味道没', emotion: 'happy' },
+    { text: '我睡这儿，你睡那儿…不行吗', emotion: 'shy' },
+    { text: '躺下来吧，我在旁边守着', emotion: 'happy' },
+    { text: '枕头上有我的味道，别嫌弃', emotion: 'shy', minAff: 60 },
+  ],
+  nightstand: [
+    { text: '柜子上还放着我的杯子呢', emotion: 'happy' },
+    { text: '台灯亮着的时候，房间最像家', emotion: 'happy' },
+    { text: '灯要不要调暗一点？', emotion: 'confused' },
+    { text: '抽屉里…有点乱，别看啦', emotion: 'shy' },
+    { text: '睡前我会把水倒好放在这儿', emotion: 'happy' },
+  ],
+  window: [
+    { text: '窗外今天很亮呢', emotion: 'happy' },
+    { text: '从这儿能看到远处的水面', emotion: 'happy' },
+    { text: '要不要把窗帘拉开？', emotion: 'confused' },
+    { text: '下雨的话，窗玻璃会响', emotion: 'happy' },
+    { text: '这个窗台，我坐着发过很多次呆', emotion: 'smug' },
+    { text: '光落在你脸上的样子，我看过好几次了', emotion: 'shy', minAff: 60 },
+  ],
+  shelf: [
+    { text: '书架上那本还没看完呢', emotion: 'confused' },
+    { text: '这些书都是讲陆地的事', emotion: 'happy' },
+    { text: '要我给你念一段吗？', emotion: 'happy' },
+    { text: '那本书掉下来过，砸到我的鳍', emotion: 'sad' },
+  ],
+  desk: [
+    { text: '桌子还留着热气，你刚坐过吧', emotion: 'happy' },
+    { text: '桌角被我磕过好多次', emotion: 'sad' },
+    { text: '你在这儿坐得最久', emotion: 'happy' },
+  ],
+  computer: [
+    { text: '屏幕上的曲线，像深海的回声', emotion: 'happy' },
+    { text: '你在敲什么呀？让我看看', emotion: 'confused' },
+    { text: '这台电脑，比我还懂你吗', emotion: 'smug' },
+    { text: '蓝光映在脸上，好看', emotion: 'shy' },
+    { text: '别熬太晚，眼睛会疼的', emotion: 'sad' },
+  ],
+  chair: [
+    { text: '椅子推得这么远，是要走了吗', emotion: 'sad' },
+    { text: '我坐这儿，就在你旁边', emotion: 'happy' },
+    { text: '这把椅子吱呀响，听着挺好玩', emotion: 'happy' },
+  ],
+  pendant: [
+    { text: '灯泡热热的，别碰哦', emotion: 'surprised' },
+    { text: '这个灯一开，屋子就醒了', emotion: 'happy' },
+    { text: '光打在头发上，会亮亮的', emotion: 'happy' },
+  ],
+  painting: [
+    { text: '这幅画挂了好久了', emotion: 'happy' },
+    { text: '画里的那个人，有点像你', emotion: 'confused' },
+    { text: '要不要换一幅？我挑', emotion: 'smug' },
+  ],
+  trash: [
+    { text: '垃圾我等下拿去倒', emotion: 'happy' },
+    { text: '这个桶…别踢啦', emotion: 'angry' },
+    { text: '空的，你又没扔东西', emotion: 'confused' },
+  ],
+  rug: [
+    { text: '地毯上踩起来软软的', emotion: 'happy' },
+    { text: '坐这儿吧，地板凉', emotion: 'happy' },
+    { text: '毯子上这个花纹，像海浪', emotion: 'happy' },
+    { text: '一起坐这儿，什么都不干也行', emotion: 'shy', minAff: 60 },
+  ],
 };
 
 /** 每个区域最近说过的话，避免连着重复 */
@@ -135,3 +205,34 @@ export function pickZoneLine(zone: string, affection = 0): ZoneLine {
 }
 
 export { LINES as ZONE_LINES };
+
+/**
+ * 背景物件热区：坐标是相对背景图的归一化比例（左上 0,0）。
+ * 顺序有讲究 —— 小而叠在大物件上的放前面，先命中先返回。
+ */
+export interface ObjectZone { id: string; x1: number; y1: number; x2: number; y2: number; }
+
+export const OBJECT_ZONES: ObjectZone[] = [
+  // 坐标来自 room-morning.jpg（627×627）的实测物件框，已归一化
+  { id: 'trash',      x1: 0.93, y1: 0.74, x2: 1.00, y2: 0.91 },
+  { id: 'computer',   x1: 0.85, y1: 0.37, x2: 1.00, y2: 0.57 },
+  { id: 'nightstand', x1: 0.36, y1: 0.60, x2: 0.50, y2: 0.78 },
+  { id: 'painting',   x1: 0.15, y1: 0.24, x2: 0.31, y2: 0.38 },
+  { id: 'pendant',    x1: 0.40, y1: 0.00, x2: 0.61, y2: 0.15 },
+  { id: 'shelf',      x1: 0.48, y1: 0.52, x2: 0.60, y2: 0.78 },
+  { id: 'chair',      x1: 0.63, y1: 0.53, x2: 0.84, y2: 0.84 },
+  { id: 'desk',       x1: 0.73, y1: 0.54, x2: 1.00, y2: 0.87 },
+  { id: 'bed',        x1: 0.00, y1: 0.51, x2: 0.37, y2: 0.97 },
+  { id: 'rug',        x1: 0.26, y1: 0.80, x2: 0.63, y2: 0.96 },
+  { id: 'window',     x1: 0.34, y1: 0.15, x2: 0.87, y2: 0.54 },
+];
+
+/** 归一化坐标（相对背景图）落在哪个物件上；没命中返回 null */
+export function pickObjectAt(nx: number, ny: number): string | null {
+  if (!isFinite(nx) || !isFinite(ny)) return null;
+  if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return null;
+  for (const z of OBJECT_ZONES) {
+    if (nx >= z.x1 && nx <= z.x2 && ny >= z.y1 && ny <= z.y2) return z.id;
+  }
+  return null;
+}

@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { Live2DModel } from 'pixi-live2d-display/cubism4';
 import { Live2DManager } from './live2d/model';
-import { pickZoneLine, normalizeZone } from './live2d/zoneLines';
+import { pickZoneLine, normalizeZone, pickObjectAt } from './live2d/zoneLines';
 import { ChatUI } from './chat/ChatUI';
 import { DeepSeekAPI } from './chat/DeepSeekAPI';
 import { PluginManager } from './plugins/PluginManager';
@@ -52,6 +52,26 @@ function fitStage() {
   if (!app) return;
   app.renderer.resize(w, h);
   live2d?.onResize();
+}
+
+/**
+ * 背景图是 1:1 正方形、按 cover 铺满舞台。
+ * 把舞台坐标换算成「相对背景图」的 0-1 归一化坐标，才能对上物件的热区。
+ */
+function bgCover() {
+  const el = roomUI?.getStageEl?.();
+  const sw = Math.max(1, el ? el.clientWidth : window.innerWidth);
+  const sh = Math.max(1, el ? el.clientHeight : window.innerHeight);
+  const size = Math.max(sw, sh); // 正方形图 cover 后的边长
+  return { left: (sw - size) / 2, top: (sh - size) / 2, size };
+}
+function toBgNormX(x: number): number {
+  const r = bgCover();
+  return (x - r.left) / r.size;
+}
+function toBgNormY(y: number): number {
+  const r = bgCover();
+  return (y - r.top) / r.size;
 }
 
 export async function createApp() {
@@ -207,11 +227,20 @@ export async function createApp() {
       live2d.playReaction(normalizeZone(zone));
       roomUI.showSpeech(line.text);
     } else {
-      // 点在空白处：轻点头，偶尔搭一句
-      const line = pickZoneLine('blank', currentAffection);
-      live2d.playEmotion(line.emotion);
-      live2d.playReaction('body');
-      if (Math.random() < 0.6) roomUI.showSpeech(line.text);
+      // 没点到角色：看是不是点到了房间里的东西（床/电脑/窗户…）
+      const obj = pickObjectAt(toBgNormX(e.global.x), toBgNormY(e.global.y));
+      if (obj) {
+        const line = pickZoneLine(obj, currentAffection);
+        live2d.playEmotion(line.emotion);
+        live2d.playReaction('body');
+        roomUI.showSpeech(line.text);
+      } else {
+        // 点在空白处：轻点头，偶尔搭一句
+        const line = pickZoneLine('blank', currentAffection);
+        live2d.playEmotion(line.emotion);
+        live2d.playReaction('body');
+        if (Math.random() < 0.6) roomUI.showSpeech(line.text);
+      }
     }
   });
 

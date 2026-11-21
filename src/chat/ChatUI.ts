@@ -394,6 +394,11 @@ export class ChatUI {
 
   mount(parent: HTMLElement) {
     parent.appendChild(this.root);
+    // 设置弹窗搬到 body：祖先有 backdrop-filter 会变成 fixed 的包含块，
+    // 留在侧栏里定位会按侧栏高度算，手机上一开就被顶出屏幕且滚不动。
+    if (this.settingsPanel.parentElement !== document.body) {
+      document.body.appendChild(this.settingsPanel);
+    }
     this.loadSavedKey();
     void this.loadVoiceState();
     void this.loadUserAvatar();
