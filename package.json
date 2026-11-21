@@ -1,0 +1,20 @@
+{
+  "name": "deepseek-live2d",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "pixi.js": "^7.4.2",
+    "pixi-live2d-display": "0.5.0-beta",
+    "idb": "^8.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^5.3.0"
+  }
+}
